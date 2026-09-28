@@ -120,7 +120,7 @@ router.post('/ask', optionalAuth, async (req, res) => {
 });
 
 // DELETE /api/doubts/clear - Clear user's entire doubt history
-router.delete('/clear', authenticateToken, async (req, res) => {
+router.delete('/clear', optionalAuth, async (req, res) => {
   try {
     try {
       await Doubt.deleteMany({ userId: req.userId });
@@ -134,7 +134,7 @@ router.delete('/clear', authenticateToken, async (req, res) => {
 });
 
 // POST /api/doubts/save-note
-router.post('/save-note', authenticateToken, async (req, res) => {
+router.post('/save-note', optionalAuth, async (req, res) => {
   try {
     const { doubtId } = req.body;
     try {
