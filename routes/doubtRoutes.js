@@ -37,49 +37,51 @@ router.get('/history', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/doubts/ask - FR3 & FR4 Core Endpoint
+// POST /api/doubts/ask - FR3 & FR4 Core Endpoint (Supports Text & Camera Images)
 router.post('/ask', authenticateToken, async (req, res) => {
   try {
-    const { query, subject } = req.body;
-    if (!query || !query.trim()) {
-      return res.status(400).json({ error: 'Academic doubt query is required.' });
+    const { query, subject, image, mimeType } = req.body;
+    if ((!query || !query.trim()) && !image) {
+      return res.status(400).json({ error: 'Academic doubt query or camera image is required.' });
     }
 
-    const trimmedQuery = query.trim();
+    const trimmedQuery = (query && query.trim()) ? query.trim() : 'Transcribe, solve and explain the academic problem in this image with step-by-step mathematical reasoning.';
     const normQ = normalizeText(trimmedQuery);
 
-    // FR4 Step 1: Check Doubt History database for Auto-FAQ similarity match FIRST
-    const similarityMatch = await findSimilarDoubt(trimmedQuery, req.userId);
+    // If no image, check Doubt History database for Auto-FAQ similarity match FIRST
+    if (!image) {
+      const similarityMatch = await findSimilarDoubt(trimmedQuery, req.userId);
 
-    if (similarityMatch && similarityMatch.doubt) {
-      const cachedDoubt = similarityMatch.doubt;
+      if (similarityMatch && similarityMatch.doubt) {
+        const cachedDoubt = similarityMatch.doubt;
 
-      return res.json({
-        success: true,
-        source: 'AUTO_FAQ_CACHE',
-        isAutoFaqMatch: true,
-        similarityScore: Math.round(similarityMatch.similarityScore * 100),
-        chat: {
-          id: cachedDoubt._id ? cachedDoubt._id.toString() : 'faq_' + Date.now(),
-          question: trimmedQuery,
-          answer: cachedDoubt.answer,
+        return res.json({
+          success: true,
+          source: 'AUTO_FAQ_CACHE',
           isAutoFaqMatch: true,
-          matchQuestion: cachedDoubt.question,
-          createdAt: new Date()
-        }
-      });
+          similarityScore: Math.round(similarityMatch.similarityScore * 100),
+          chat: {
+            id: cachedDoubt._id ? cachedDoubt._id.toString() : 'faq_' + Date.now(),
+            question: trimmedQuery,
+            answer: cachedDoubt.answer,
+            isAutoFaqMatch: true,
+            matchQuestion: cachedDoubt.question,
+            createdAt: new Date()
+          }
+        });
+      }
     }
 
-    // FR4 Step 2: No match found -> Query Gemini API (FR3)
-    const aiAnswer = await generateDoubtExplanation(trimmedQuery);
+    // Query Gemini API (FR3) with optional Camera Image
+    const aiAnswer = await generateDoubtExplanation(trimmedQuery, image, mimeType);
 
-    // FR4 Step 3: Store pair in MongoDB
+    // Store pair in MongoDB
     const newDoubtData = {
       userId: req.userId,
       question: trimmedQuery,
       normalizedQuestion: normQ,
       answer: aiAnswer,
-      subject: subject || 'General Academic',
+      subject: subject || (image ? 'Camera OCR & Visual Doubt' : 'General Academic'),
       isAutoFaqMatch: false,
       useCount: 1,
       createdAt: new Date()
@@ -107,11 +109,27 @@ router.post('/ask', authenticateToken, async (req, res) => {
         question: trimmedQuery,
         answer: aiAnswer,
         isAutoFaqMatch: false,
+        hasImage: !!image,
         createdAt: savedDoubt.createdAt
       }
     });
   } catch (error) {
+    console.error('Error generating doubt response:', error);
     res.status(500).json({ error: 'Server error generating doubt response' });
+  }
+});
+
+// DELETE /api/doubts/clear - Clear user's entire doubt history
+router.delete('/clear', authenticateToken, async (req, res) => {
+  try {
+    try {
+      await Doubt.deleteMany({ userId: req.userId });
+    } catch (e) {
+      memoryDoubts = memoryDoubts.filter(d => d.userId !== req.userId);
+    }
+    res.json({ success: true, message: 'Doubt history cleared successfully.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to clear doubt history.' });
   }
 });
 

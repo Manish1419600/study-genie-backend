@@ -1,7 +1,7 @@
 // services/geminiService.js - Google Gemini API Integration with Multi-Model Fallback & Content-Aware Engine
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 let genAI = null;
 
 if (GEMINI_API_KEY && GEMINI_API_KEY.trim() !== '') {
@@ -43,17 +43,17 @@ async function callGemini(prompt, isJson = false) {
 }
 
 /**
- * FR3 – Generate step-by-step academic explanation for a user doubt
+ * FR3 – Generate step-by-step academic explanation for a user doubt (Supports Text & Camera Images)
  */
-async function generateDoubtExplanation(query) {
-  const prompt = `You are StudyGenie AI, an expert academic professor and tutor.
-Answer the following student doubt with a clear LaTeX math equation (if applicable), deep conceptual explanation, and 2-3 key takeaway bullet points.
+async function generateDoubtExplanation(query, imageBase64 = null, mimeType = 'image/jpeg') {
+  const promptText = `You are StudyGenie AI, an expert academic professor and tutor.
+Answer the following student doubt${imageBase64 ? ' and analyze the attached textbook/problem image' : ''} with a clear LaTeX math equation (if applicable), deep step-by-step conceptual explanation, and 2-3 key takeaway bullet points.
 Student Doubt Query: "${query}"
 
 Return your response strictly as a JSON object matching this schema:
 {
-  "equation": "LaTeX formula string (e.g., \\frac{1}{2}mv^2 or empty string if conceptual)",
-  "equationSubtitle": "Brief academic title of the equation",
+  "equation": "LaTeX formula string (e.g., \\frac{1}{2}mv^2 or empty string if purely conceptual)",
+  "equationSubtitle": "Brief academic title of the equation or topic",
   "explanation": "Markdown formatted step-by-step academic explanation with bold terms and clear sections",
   "keyPoints": [
     { "title": "Key Concept 1", "text": "Detailed takeaway point" },
@@ -61,7 +61,21 @@ Return your response strictly as a JSON object matching this schema:
   ]
 }`;
 
-  const responseText = await callGemini(prompt, true);
+  let contentPayload = promptText;
+  if (imageBase64) {
+    const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    contentPayload = [
+      promptText,
+      {
+        inlineData: {
+          data: cleanBase64,
+          mimeType: mimeType || 'image/jpeg'
+        }
+      }
+    ];
+  }
+
+  const responseText = await callGemini(contentPayload, true);
   if (responseText) {
     try {
       const cleaned = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
