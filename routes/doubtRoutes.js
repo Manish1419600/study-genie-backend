@@ -4,12 +4,12 @@ const router = express.Router();
 const Doubt = require('../models/Doubt');
 const { generateDoubtExplanation } = require('../services/geminiService');
 const { findSimilarDoubt, normalizeText } = require('../services/faqSimilarityService');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, optionalAuth } = require('../middleware/auth');
 
 let memoryDoubts = [];
 
-// GET /api/doubts/history - Fetch user's doubts & popular user FAQs
-router.get('/history', authenticateToken, async (req, res) => {
+// GET /api/doubts/history - Fetch user's doubts & popular user FAQs (Supports guests & authenticated users)
+router.get('/history', optionalAuth, async (req, res) => {
   try {
     let userDoubts = [];
     let faqs = [];
@@ -37,8 +37,8 @@ router.get('/history', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/doubts/ask - FR3 & FR4 Core Endpoint (Supports Text & Camera Images)
-router.post('/ask', authenticateToken, async (req, res) => {
+// POST /api/doubts/ask - FR3 & FR4 Core Endpoint (Works for Guests & Signed-In Users)
+router.post('/ask', optionalAuth, async (req, res) => {
   try {
     const { query, subject, image, mimeType } = req.body;
     if ((!query || !query.trim()) && !image) {

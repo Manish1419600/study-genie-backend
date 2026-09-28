@@ -21,4 +21,27 @@ const authenticateToken = (req, res, next) => {
   }
 };
 
-module.exports = { authenticateToken, JWT_SECRET };
+const optionalAuth = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    req.userId = 'guest_student';
+    req.isGuest = true;
+    return next();
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.userId = decoded.userId;
+    req.userEmail = decoded.email;
+    req.isGuest = false;
+    next();
+  } catch (err) {
+    req.userId = 'guest_student';
+    req.isGuest = true;
+    next();
+  }
+};
+
+module.exports = { authenticateToken, optionalAuth, JWT_SECRET };
