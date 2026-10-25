@@ -57,8 +57,13 @@ io.on('connection', (socket) => {
   });
 });
 
-// Root Status Endpoint
+// Root Endpoint: Serve Frontend Web App if built, or fallback to backend status
 app.get('/', (req, res) => {
+  const indexPath = path.join(publicDir, 'index.html');
+  const fs = require('fs');
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
   if (req.accepts('html')) {
     return res.send(`
       <!DOCTYPE html>
@@ -133,6 +138,17 @@ app.post('/api/chat/ask', (req, res, next) => {
 app.get('/api/chat/history', (req, res, next) => {
   req.url = '/history';
   doubtRoutes(req, res, next);
+});
+
+// Serve Production Frontend Static App
+const publicDir = path.join(__dirname, 'public');
+app.use(express.static(publicDir));
+
+// Fallback all non-API routes to index.html for React SPA
+app.get('*', (req, res) => {
+  if (!req.path.startsWith('/api/')) {
+    res.sendFile(path.join(publicDir, 'index.html'));
+  }
 });
 
 function startServer(port) {
