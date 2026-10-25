@@ -54,21 +54,27 @@ router.post('/ask', optionalAuth, async (req, res) => {
 
       if (similarityMatch && similarityMatch.doubt) {
         const cachedDoubt = similarityMatch.doubt;
+        const isStaleBadCache = (
+          (cachedDoubt.answer?.equationSubtitle?.includes('Taylor') || cachedDoubt.answer?.explanation?.includes('Analytical Expansion')) &&
+          !trimmedQuery.toLowerCase().includes('taylor')
+        );
 
-        return res.json({
-          success: true,
-          source: 'AUTO_FAQ_CACHE',
-          isAutoFaqMatch: true,
-          similarityScore: Math.round(similarityMatch.similarityScore * 100),
-          chat: {
-            id: cachedDoubt._id ? cachedDoubt._id.toString() : 'faq_' + Date.now(),
-            question: trimmedQuery,
-            answer: cachedDoubt.answer,
+        if (!isStaleBadCache) {
+          return res.json({
+            success: true,
+            source: 'AUTO_FAQ_CACHE',
             isAutoFaqMatch: true,
-            matchQuestion: cachedDoubt.question,
-            createdAt: new Date()
-          }
-        });
+            similarityScore: Math.round(similarityMatch.similarityScore * 100),
+            chat: {
+              id: cachedDoubt._id ? cachedDoubt._id.toString() : 'faq_' + Date.now(),
+              question: trimmedQuery,
+              answer: cachedDoubt.answer,
+              isAutoFaqMatch: true,
+              matchQuestion: cachedDoubt.question,
+              createdAt: new Date()
+            }
+          });
+        }
       }
     }
 

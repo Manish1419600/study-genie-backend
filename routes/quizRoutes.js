@@ -5,12 +5,12 @@ const Quiz = require('../models/Quiz');
 const Note = require('../models/Note');
 const Progress = require('../models/Progress');
 const { generateQuizMCQs } = require('../services/geminiService');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, optionalAuth } = require('../middleware/auth');
 
 let memoryQuizzes = [];
 
 // GET /api/quiz - Fetch user's quizzes
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
   try {
     let quizzes = [];
     try {
@@ -25,7 +25,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // GET /api/quiz/:id
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const quizId = req.params.id;
     let quiz = null;
@@ -46,7 +46,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 // POST /api/quiz/generate - Generate MCQs from topic/note content
-router.post('/generate', authenticateToken, async (req, res) => {
+router.post('/generate', optionalAuth, async (req, res) => {
   try {
     const { topic, noteId, difficulty } = req.body;
     const selectedDifficulty = ['Easy', 'Medium', 'Hard'].includes(difficulty) ? difficulty : 'Medium';
@@ -102,7 +102,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
 });
 
 // POST /api/quiz/:id/submit - Submit quiz attempt & get immediate score
-router.post('/:id/submit', authenticateToken, async (req, res) => {
+router.post('/:id/submit', optionalAuth, async (req, res) => {
   try {
     const quizId = req.params.id;
     const { userAnswers } = req.body;
