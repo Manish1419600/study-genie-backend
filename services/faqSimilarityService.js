@@ -1,6 +1,24 @@
 // services/faqSimilarityService.js - Doubt History Auto-FAQ Similarity Checker (FR4)
 const Doubt = require('../models/Doubt');
 
+const STOP_WORDS = new Set([
+  'what', 'is', 'the', 'a', 'an', 'are', 'was', 'were', 'how', 'why', 'who', 'when', 'where',
+  'can', 'you', 'explain', 'tell', 'me', 'about', 'please', 'solve', 'define', 'describe',
+  'of', 'in', 'on', 'at', 'to', 'for', 'with', 'from', 'by', 'does', 'do', 'did'
+]);
+
+// Extract significant content keywords
+function extractKeywords(text) {
+  if (!text) return new Set();
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^\w\s]/gi, '')
+      .split(/\s+/)
+      .filter(w => w.length > 1 && !STOP_WORDS.has(w))
+  );
+}
+
 // Normalize text for token comparison
 function normalizeText(text) {
   if (!text) return '';
@@ -10,23 +28,22 @@ function normalizeText(text) {
     .trim();
 }
 
-// Compute Jaccard Similarity index between two question strings
+// Compute Jaccard Similarity index based on significant keywords
 function computeJaccardSimilarity(str1, str2) {
   const norm1 = normalizeText(str1);
   const norm2 = normalizeText(str2);
 
   if (norm1 === norm2) return 1.0;
 
-  // Exact substring check
-  if (norm1.includes(norm2) || norm2.includes(norm1)) {
-    const lenRatio = Math.min(norm1.length, norm2.length) / Math.max(norm1.length, norm2.length);
-    if (lenRatio > 0.6) return 0.85;
-  }
-
-  const set1 = new Set(norm1.split(/\s+/).filter(w => w.length > 2));
-  const set2 = new Set(norm2.split(/\s+/).filter(w => w.length > 2));
+  const set1 = extractKeywords(str1);
+  const set2 = extractKeywords(str2);
 
   if (set1.size === 0 || set2.size === 0) return 0;
+
+  // If keyword sets are identical
+  if (set1.size === set2.size && [...set1].every(w => set2.has(w))) {
+    return 1.0;
+  }
 
   let intersectionCount = 0;
   for (const word of set1) {
@@ -54,7 +71,8 @@ async function findSimilarDoubt(query, userId) {
       return null;
     }
 
-    const SIMILARITY_THRESHOLD = 0.65; // 65% token similarity threshold
+    // High threshold (0.90) ensures we only reuse cache for genuinely identical questions
+    const SIMILARITY_THRESHOLD = 0.90;
     let bestMatch = null;
     let highestScore = 0;
 
